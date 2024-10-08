@@ -1,0 +1,71 @@
+pipeline {
+    agent any  // Run on any available Jenkins agent
+
+    environment {
+        GIT_REPO_URL = 'https://github.com/your-username/your-repo.git'  // Your GitHub repo URL
+        BRANCH = 'main'  // Git branch to build from (change if necessary)
+        DEPLOY_SERVER = 'ec2-user@your-ec2-instance'  // Change to your deployment server details
+        APP_DIR = '/var/www/your-app'  // Deployment directory on your server
+    }
+
+    stages {
+        stage('Checkout from GitHub') {
+            steps {
+                // Checkout the code from GitHub
+                git branch: "${BRANCH}", url: "${GIT_REPO_URL}"
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                // Install dependencies for a Node.js application
+                // For other languages (like Java or Python), modify the command accordingly
+                sh 'npm install'
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                // Run tests defined in the package.json
+                // Modify this if you're using a different framework (pytest, Maven, etc.)
+                sh 'npm test'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                // Build the application (if necessary)
+                // Skip this for interpreted languages like Python, or replace with the appropriate build command for Java, etc.
+                sh 'npm run build'
+            }
+        }
+
+        stage('Deploy to EC2') {
+            steps {
+                // Use SSH to deploy the application to a remote server (EC2 instance, etc.)
+                sshagent(credentials: ['your-ssh-credentials-id']) {
+                    // Remove old files and copy new files to the server
+                    sh '''
+                    ssh ${DEPLOY_SERVER} "rm -rf ${APP_DIR}/*"
+                    scp -r ./build/* ${DEPLOY_SERVER}:${APP_DIR}/
+                    ssh ${DEPLOY_SERVER} "sudo systemctl restart your-app-service"
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline completed successfully'
+        }
+
+        failure {
+            echo 'Pipeline failed. Check the logs for details.'
+        }
+
+        always {
+            cleanWs()  // Clean up the workspace after the build is finished
+        }
+    }
+}
